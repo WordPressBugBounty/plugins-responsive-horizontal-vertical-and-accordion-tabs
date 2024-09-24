@@ -1,0 +1,1 @@
+# plugins-responsive-horizontal-vertical-and-accordion-tabs
