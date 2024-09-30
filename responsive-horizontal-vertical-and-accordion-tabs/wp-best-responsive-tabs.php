@@ -5,7 +5,7 @@
  * Plugin URI:https://www.i13websolution.com
  * Description:This is beautiful responsive all in one tabs for wordpress sites/blogs. Add any number of tabs sets to your site. your tabs sets will be ready within few min. 
  * Author:I Thirteen Web Solution 
- * Version:1.1.18
+ * Version:1.1.19
  * Text Domain:responsive-horizontal-vertical-and-accordion-tabs
  * Domain Path: /languages
  */
@@ -691,7 +691,7 @@ function rt_wp_responsive_wp_admin_options_func() {
                                                                                             <td class="alignCenter" data-title="<?php echo __("Id",'responsive-horizontal-vertical-and-accordion-tabs');?>"><?php echo intval($row->id); ?></td>
                                                                                             <td class="alignCenter" data-title="<?php echo __("Name",'responsive-horizontal-vertical-and-accordion-tabs');?>"><strong><?php echo esc_html($row->name); ?></strong></td>
                                                                                             <td class="alignCenter" data-title="<?php echo __("Created On",'responsive-horizontal-vertical-and-accordion-tabs');?>"><?php echo esc_html($row->createdon); ?></td>
-                                                                                            <td class="alignCenter" data-title="<?php echo __("ShortCode",'responsive-horizontal-vertical-and-accordion-tabs');?>" scope="col"><span><input type="text" spellcheck="false" onclick="this.focus(); this.select()" readonly="readonly" style="width: 100%; height: 29px; background-color: #EEEEEE" value='[wrt_print_rt_wp_responsive_tabs tabset_id="<?php echo intval($row->id); ?>"]'></span></td>
+                                                                                            <td class="alignCenter" data-title="<?php echo __("ShortCode",'responsive-horizontal-vertical-and-accordion-tabs');?>" scope="col"><span><input type="text" spellcheck="false" onclick="this.focus(); this.select()" readonly="readonly" style="width: 100%; height: 29px; background-color: #EEEEEE" value='[wrt_print_rt_wp_responsive_tabs tabset_id="<?php echo intval($row->id); ?>"  <?php if($row->type==2 || $row->type==5):?> scroll="1" <?php endif;?>]'></span></td>
                                                                                             <td class="alignCenter" data-title="<?php echo __("Manage Tabs",'responsive-horizontal-vertical-and-accordion-tabs');?>" scope="col"><strong><a href='<?php echo $manageMedia; ?>' title="<?php echo __("Manage Tabs",'responsive-horizontal-vertical-and-accordion-tabs');?>"><?php echo __("Manage Tabs",'responsive-horizontal-vertical-and-accordion-tabs');?></a></strong></td>
                                                                                             <td class="alignCenter" data-title="<?php echo __("Edit",'responsive-horizontal-vertical-and-accordion-tabs');?>"><strong><a href='<?php echo esc_html($editlink); ?>' title="<?php echo __("Edit",'responsive-horizontal-vertical-and-accordion-tabs');?>"><?php echo __("Edit",'responsive-horizontal-vertical-and-accordion-tabs');?></a></strong></td>
                                                                                             <td class="alignCenter" data-title="<?php echo __("Delete",'responsive-horizontal-vertical-and-accordion-tabs');?>"><strong><a  href='<?php echo esc_html($deletelink); ?>' onclick="return confirmDelete();" title="<?php echo __("Delete",'responsive-horizontal-vertical-and-accordion-tabs');?>"><?php echo __("Delete",'responsive-horizontal-vertical-and-accordion-tabs');?></a> </strong></td>
@@ -1500,10 +1500,16 @@ function rt_wp_responsive_wp_admin_options_func() {
 function rt_wp_responsive_tabs_data_management() {
     
         $tabid = 0;
+        global $wpdb;
+        
 	if (isset ( $_GET ['tabid'] ) and $_GET ['tabid'] > 0) {
 		// do nothing
 		
 		$tabid = intval(sanitize_text_field( $_GET ['tabid'] ));
+                
+                $query="SELECT * FROM ".$wpdb->prefix."wrt_tabs_settings WHERE id=$tabid";
+                $settings  = $wpdb->get_row($query,ARRAY_A);
+               
                 
 	} else {
 		
@@ -1517,7 +1523,7 @@ function rt_wp_responsive_tabs_data_management() {
 	}
         
 	$action = 'gridview';
-	global $wpdb;
+	
 	
         $location = "admin.php?page=rt_wp_responsive_tabs&tabid=$tabid";
         
@@ -1892,12 +1898,16 @@ function rt_wp_responsive_tabs_data_management() {
                             </div>
                         <h3><?php echo __('To print this tab sets into WordPress Post/Page use below code','responsive-horizontal-vertical-and-accordion-tabs');?></h3>
 		<input type="text"
-			value='[wrt_print_rt_wp_responsive_tabs tabset_id="<?php echo intval($tabid); ?>"] '
+			value='[wrt_print_rt_wp_responsive_tabs tabset_id="<?php echo intval($tabid); ?>" <?php if($settings['type']==2 || $settings['type']==5):?> scroll="1" <?php endif;?>] '
 			style="width: 400px; height: 30px"
 			onclick="this.focus(); this.select()" />
 		<h3><?php echo __('To print this tab sets into WordPress theme/template PHP files use below code','responsive-horizontal-vertical-and-accordion-tabs');?></h3>
                 <?php
-		$shortcode = '[wrt_print_rt_wp_responsive_tabs tabset_id="'.intval($tabid).'"]';
+                $scroll='';
+               if($settings['type']==2 || $settings['type']==5){ 
+                   $scroll='scroll="1"';
+               }
+		$shortcode = '[wrt_print_rt_wp_responsive_tabs tabset_id="'.intval($tabid).'" '.$scroll.']';
 		?>
                 <input type="text"
 			value="&lt;?php echo do_shortcode('<?php echo htmlentities($shortcode, ENT_QUOTES); ?>'); ?&gt;"
@@ -2557,13 +2567,21 @@ function wrt_rt_wp_responsive_tabs_preview_func(){
                 </div>
                 <?php if(is_array($settings)){?>
 
+                    <?php 
+                        $query="SELECT * FROM ".$wpdb->prefix."wrt_tabs_settings WHERE id=$tabid";
+                        $settings  = $wpdb->get_row($query,ARRAY_A);
+                     ?>
                     <h3><?php echo __( 'To print this tab sets into WordPress Post/Page use below code','responsive-horizontal-vertical-and-accordion-tabs');?></h3>
-                    <input type="text" value='[wrt_print_rt_wp_responsive_tabs tabset_id="<?php echo $tabid;?>"] ' style="width: 400px;height: 30px" onclick="this.focus();this.select()" />
+                    <input type="text" value='[wrt_print_rt_wp_responsive_tabs tabset_id="<?php echo intval($tabid); ?>" <?php if($settings['type']==2 || $settings['type']==5):?> scroll="1" <?php endif;?>] ' style="width: 400px;height: 30px" onclick="this.focus();this.select()" />
                     <div class="clear"></div>
                     <h3><?php echo __( 'To print this tab sets into WordPress theme/template PHP files use below code','responsive-horizontal-vertical-and-accordion-tabs');?></h3>
-                    <?php
-                        $shortcode='[wrt_print_rt_wp_responsive_tabs tabset_id="'.$tabid.'"]';
-                    ?>
+                     <?php
+                $scroll='';
+               if($settings['type']==2 || $settings['type']==5){ 
+                   $scroll='scroll="1"';
+               }
+		$shortcode = '[wrt_print_rt_wp_responsive_tabs tabset_id="'.intval($tabid).'" '.$scroll.']';
+                ?>
                     <input type="text" value="&lt;?php echo do_shortcode('<?php echo htmlentities($shortcode, ENT_QUOTES); ?>'); ?&gt;" style="width: 400px;height: 30px" onclick="this.focus();this.select()" />
 
                 <?php } ?>
@@ -2579,8 +2597,10 @@ function wrt_rt_wp_responsive_tabs_preview_func(){
 function wrt_print_rt_wp_responsive_tabs_func($atts){
 
         global $wpdb;
-        extract(shortcode_atts(array('tabset_id' => 0,), $atts));
+        extract(shortcode_atts(array('tabset_id' => 0,'scroll'=>1), $atts));
         $tabset_id=intval($tabset_id);
+        $scroll=intval($scroll);
+        
         $query="SELECT * FROM ".$wpdb->prefix."wrt_tabs_settings WHERE id=$tabset_id";
         $settings  = $wpdb->get_row($query,ARRAY_A);            
         $rand2=uniqid('wrt_');
@@ -2767,13 +2787,14 @@ function wrt_print_rt_wp_responsive_tabs_func($atts){
                                              jQuery("#<?php echo $rand; ?>_overlay").css("height", "0px");
 
                                              jQuery(thisele).data("isajaxloaded","1"); 
+                                             <?php if($scroll=="1"):?>
+                                                if(jQuery(thisele).hasClass('resp-accordion')){
+                                                   jQuery('html, body').animate({
+                                                         scrollTop: (jQuery('.hor_<?php echo $rand;?> [data-tabid='+tabid+']').first().offset().top+200)
+                                                     },1500);
 
-                                             if(jQuery(thisele).hasClass('resp-accordion')){
-                                                jQuery('html, body').animate({
-                                                      scrollTop: (jQuery('.hor_<?php echo $rand;?> [data-tabid='+tabid+']').first().offset().top+200)
-                                                  },1500);
-
-                                              }  
+                                                 }  
+                                             <?php endif;?>    
 
                                        },
                                        error: function(XMLHttpRequest, textStatus, errorThrown) {
@@ -2785,13 +2806,14 @@ function wrt_print_rt_wp_responsive_tabs_func($atts){
 
 
                                    }else{
+                                        <?php if($scroll==1):?>
+                                            if(jQuery(thisele).hasClass('resp-accordion')){
+                                                jQuery('html, body').animate({
+                                                      scrollTop: (jQuery('.hor_<?php echo $rand;?> [data-tabid='+tabid+']').first().offset().top+200)
+                                                  },1500);
 
-                                        if(jQuery(thisele).hasClass('resp-accordion')){
-                                            jQuery('html, body').animate({
-                                                  scrollTop: (jQuery('.hor_<?php echo $rand;?> [data-tabid='+tabid+']').first().offset().top+200)
-                                              },1500);
-
-                                          } 
+                                              } 
+                                          <?php endif;?>
                                    }
 
 

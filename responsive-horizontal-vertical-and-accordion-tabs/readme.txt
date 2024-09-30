@@ -4,8 +4,8 @@ Donate link:http://www.i13websolution.com/donate-wordpress_image_thumbnail.php
 Tags:Accordion tabs, Vertical tabs,horizontal tabs,wp tabs,Responsive Tabs, All in one tabs
 Requires at least:3.0
 Tested up to:6.6
-Version:1.1.18
-Stable tag:1.1.18
+Version:1.1.19
+Stable tag:1.1.19
 License:GPLv2 or later
 License URI:http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -110,6 +110,10 @@ This plugin is free for everyone! Since it's released under the GPL, you can use
 
 
 == Changelog ==
+
+= 1.1.19 =
+
+* Added shortcode param to disable scroll on tab click
 
 = 1.1.18 =
 
