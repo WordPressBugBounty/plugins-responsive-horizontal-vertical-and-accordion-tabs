@@ -3,7 +3,7 @@ Contributors:nik00726
 Donate link:http://www.i13websolution.com/donate-wordpress_image_thumbnail.php
 Tags:Accordion tabs, Vertical tabs,horizontal tabs,wp tabs,Responsive Tabs, All in one tabs
 Requires at least:3.0
-Tested up to:6.6
+Tested up to:6.7
 Version:1.1.19
 Stable tag:1.1.19
 License:GPLv2 or later
