@@ -5,7 +5,7 @@
  * Plugin URI:https://www.i13websolution.com
  * Description:This is beautiful responsive all in one tabs for wordpress sites/blogs. Add any number of tabs sets to your site. your tabs sets will be ready within few min. 
  * Author:I Thirteen Web Solution 
- * Version:1.1.19
+ * Version:1.1.20
  * Text Domain:responsive-horizontal-vertical-and-accordion-tabs
  * Domain Path: /languages
  */
@@ -2706,7 +2706,7 @@ function wrt_print_rt_wp_responsive_tabs_func($atts){
                 
             
             <?php if($type==2 or $type==5):?>
-            <div id="<?php echo $tabset_id;?>_Tab" class="<?php echo $rand2;?> <?php echo $tabset_id;?>_Tab" style="visibility: hidden" > <div id="<?php echo $rand; ?>_overlay" class="overlay_" style="background: #fff url('<?php echo $loaderImg; ?>') no-repeat scroll 50% 50%;" ></div><div id="<?php echo $rand;?>" class="<?php echo $rand;?>"><ul  class="<?php if($type==2):?>vresp-tabs-list<?php else:?>resp-tabs-list <?php endif;?> hor_<?php echo $rand;?>"><?php foreach($rows as $r):?><li data-isajaxloaded="0" data-tabid="<?php echo $r['id'];?>"><?php echo trim(wp_unslash($r['tab_title']));?></li><?php endforeach;?></ul><div class="<?php if($type==2):?>vresp-tabs-container<?php else:?> resp-tabs-container<?php endif;?> hor_<?php echo $rand;?>"><?php foreach($rows as $r):?><div id="tab_<?php echo $rand;?>_<?php echo $r['id'];?>"><?php echo wpautop(wp_unslash($r['tab_description']));?></div><?php endforeach;?></div></div></div>         
+            <div id="<?php echo $tabset_id;?>_Tab" class="<?php echo $rand2;?> <?php echo $tabset_id;?>_Tab" style="visibility: hidden" > <div data-tabido="<?php echo $rand;?>" id="<?php echo $rand; ?>_overlay" class="overlay_" style="background: #fff url('<?php echo $loaderImg; ?>') no-repeat scroll 50% 50%;" ></div><div id="<?php echo $rand;?>" class="<?php echo $rand;?>"><ul  class="<?php if($type==2):?>vresp-tabs-list<?php else:?>resp-tabs-list <?php endif;?> hor_<?php echo $rand;?>"><?php foreach($rows as $r):?><li data-isajaxloaded="0" data-tabid="<?php echo $r['id'];?>"><?php echo trim(wp_unslash($r['tab_title']));?></li><?php endforeach;?></ul><div class="<?php if($type==2):?>vresp-tabs-container<?php else:?> resp-tabs-container<?php endif;?> hor_<?php echo $rand;?>"><?php foreach($rows as $r):?><div id="tab_<?php echo $rand;?>_<?php echo $r['id'];?>"><?php echo wpautop(wp_unslash($r['tab_description']));?></div><?php endforeach;?></div></div></div>         
             <!-- wrt_print_rt_wp_responsive_tabs_script --><script type="text/javascript">
 
                <?php $intval= uniqid('interval_');?>
@@ -3033,10 +3033,10 @@ function wrt_print_rt_wp_responsive_tabs_func($atts){
                     }
                    
                    </style><!-- end wrt_print_rt_wp_responsive_tabs_style -->
-                   <div class="resptabs btabs <?php echo $rand;?> <?php echo $tabset_id;?>_Tab" id="<?php echo $rand;?>" style="visibility: hidden"><div id="<?php echo $rand; ?>_overlay" class="overlay_" style="background: #fff url('<?php echo $loaderImg; ?>') no-repeat scroll 50% 50%;" ></div><div class="tab-main-container"><ul class="nav nav-tabs btab ul<?php echo $rand;?>" role="tablist"><?php foreach($rows as $k=> $r):?> <?php if($defaultSelected==null){$r['is_default']=1; $rows[$k]=$r;$defaultSelected=$r['id'];}?><?php  $ic=''; ?><?php if($r['is_default']):?><?php $default=$rand."_".$r['id'];?><?php endif;?><li role="presentation"  data-isajaxloaded="0"  data-tabid="<?php echo $r['id'];?>" <?php if($r['is_default']):?> <?php $flag=true;?> class="<?php echo $rand."_".$r['id'];?> active LiTab <?php echo $li_tab_class;?>" <?php else:?>class="<?php echo $rand."_".$r['id'];?> LiTab <?php echo $li_tab_class;?>" <?php endif;?>><a href="#tab_<?php echo $rand;?>_<?php echo $r['id'];?>"  class="LiTab_Anchor" role="tab" data-toggle="tab" data-tabid="<?php echo $r['id'];?>"  <?php if(isset($r['is_link']) and $r['is_link']):?> onclick="window.location.href='<?php echo $r['link'];?>';" <?php endif;?> > <?php echo $ic.trim(wp_unslash($r['tab_title']));?></a></li><?php endforeach;?></ul><div class="bordered-tab-contents"><div class="tab-content"> <?php foreach($rows as $r):?> <div role="tabpanel" class=" tab-pane <?php if($r['is_default']):?> active <?php endif;?>" id="tab_<?php echo $rand;?>_<?php echo $r['id'];?>" ><?php echo wpautop(wp_unslash($r['tab_description']));?></div><?php endforeach;?></div></div></div></div>
+                   <div class="resptabs btabs <?php echo $rand;?> <?php echo $tabset_id;?>_Tab" id="<?php echo $rand;?>" style="visibility: hidden"><div data-tabido="<?php echo $rand;?>" id="<?php echo $rand; ?>_overlay" class="overlay_" style="background: #fff url('<?php echo $loaderImg; ?>') no-repeat scroll 50% 50%;" ></div><div class="tab-main-container"><ul class="nav nav-tabs btab ul<?php echo $rand;?>" role="tablist"><?php foreach($rows as $k=> $r):?> <?php if($defaultSelected==null){$r['is_default']=1; $rows[$k]=$r;$defaultSelected=$r['id'];}?><?php  $ic=''; ?><?php if($r['is_default']):?><?php $default=$rand."_".$r['id'];?><?php endif;?><li role="presentation"  data-isajaxloaded="0"  data-tabid="<?php echo $r['id'];?>" <?php if($r['is_default']):?> <?php $flag=true;?> class="<?php echo $rand."_".$r['id'];?> active LiTab <?php echo $li_tab_class;?>" <?php else:?>class="<?php echo $rand."_".$r['id'];?> LiTab <?php echo $li_tab_class;?>" <?php endif;?>><a href="#tab_<?php echo $rand;?>_<?php echo $r['id'];?>"  class="LiTab_Anchor <?php if($type==4):?>click_LiTab_Anchor<?php endif;?>" role="tab" data-toggle="tab" data-tabid="<?php echo $r['id'];?>"  <?php if(isset($r['is_link']) and $r['is_link']):?> onclick="window.location.href='<?php echo $r['link'];?>';" <?php endif;?> > <?php echo $ic.trim(wp_unslash($r['tab_title']));?></a></li><?php endforeach;?></ul><div class="bordered-tab-contents"><div class="tab-content"> <?php foreach($rows as $r):?> <div role="tabpanel" class=" tab-pane <?php if($r['is_default']):?> active <?php endif;?>" id="tab_<?php echo $rand;?>_<?php echo $r['id'];?>" ><?php echo wpautop(wp_unslash($r['tab_description']));?></div><?php endforeach;?></div></div></div></div>
               
                 <!-- wrt_print_rt_wp_responsive_tabs_script --><script>
-                    
+                    var width<?php echo $rand;?>=null;
                     var orgUl<?php echo $rand;?>='';
                      var activeTab<?php echo $rand;?>='';
                      
@@ -3077,7 +3077,7 @@ function wrt_print_rt_wp_responsive_tabs_func($atts){
                                                      rtdropdownMarkup+=` rtdropdown-menu-right rtdropdown-menu<?php echo $rand;?>">`+ `</ul></li>`;
                                               }  
                                               $rtdropdown = jQuery(rtdropdownMarkup);
-                                              jQuery( "#<?php echo $rand;?> .nav-tabs").append($rtdropdown);
+                                              jQuery( "#<?php echo $rand;?> .ul<?php echo $rand;?>").append($rtdropdown);
                                               jQuery(".rtdropdown-menu<?php echo $rand;?>").append(jQuery(this).clone());
                                               flag=true;
                                           }
@@ -3138,7 +3138,7 @@ function wrt_print_rt_wp_responsive_tabs_func($atts){
 
                         jQuery(document).on("click", "#<?php echo $rand;?>  li.<?php echo $li_tab_class;?>", function(e){
 
-
+                        
                             if(activeTab<?php echo $rand;?>!="" && !jQuery(this).hasClass(activeTab<?php echo $rand;?>)){
                                 jQuery('.'+activeTab<?php echo $rand;?>).removeClass('active');
                             }
@@ -3212,6 +3212,32 @@ function wrt_print_rt_wp_responsive_tabs_func($atts){
                              }
 
                         });
+                        
+                        
+                        jQuery(".click_LiTab_Anchor").on('click',function(e) {
+                            
+                              
+                             setTimeout(function(){ 
+                                 
+                                 
+                                if(jQuery(e.target).parent().parent().parent().parent().parent().find('.bordered-tab-contents').find('.overlay_').length>0){
+                                    
+                                     jQuery(e.target).parent().parent().parent().parent().parent().find('.bordered-tab-contents').find('.overlay_').each(function( index ) {
+
+
+                                             window['changeLiToMenu'+jQuery(this).attr('data-tabido')](window['activeTab'+jQuery(this).attr('data-tabido')]);
+                                             
+                                            
+                                            
+                                       });
+
+
+                                    
+                                }
+
+                          }, 1000);
+
+                        });
                         jQuery(document).on("click", "#<?php echo $rand;?> .responsivetabs ul.rtdropdown-menu<?php echo $rand;?>.rtdropdown-menu-right li.LiTab", function(){
 
                              jQuery( "#<?php echo $rand;?> .LiTab" ).each(function( index ) {
@@ -3222,11 +3248,12 @@ function wrt_print_rt_wp_responsive_tabs_func($atts){
                              });
 
                               jQuery("#<?php echo $rand;?> .responsivetabs").addClass('active');
+                              
 
                         });
 
                         var timer<?php echo $rand;?>;
-                        var width<?php echo $rand;?> = jQuery(window).width();
+                        width<?php echo $rand;?> = jQuery(window).width();
                           jQuery(window).bind('resize', function(){
 
                            if(jQuery(window).width() != width<?php echo $rand;?>){

@@ -4,8 +4,8 @@ Donate link:http://www.i13websolution.com/donate-wordpress_image_thumbnail.php
 Tags:Accordion tabs, Vertical tabs,horizontal tabs,wp tabs,Responsive Tabs, All in one tabs
 Requires at least:3.0
 Tested up to:6.7
-Version:1.1.19
-Stable tag:1.1.19
+Version:1.1.20
+Stable tag:1.1.20
 License:GPLv2 or later
 License URI:http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -110,6 +110,11 @@ This plugin is free for everyone! Since it's released under the GPL, you can use
 
 
 == Changelog ==
+
+= 1.1.20 =
+
+* Fixed responsive tabs menu append wrong in subtab
+
 
 = 1.1.19 =
 
