@@ -1,0 +1,282 @@
+/* WP Responsive Tabs — Modern Engine (dependency-free) */
+
+.wrt-modern {
+    box-sizing: border-box;
+    font-family: inherit;
+    caret-color: transparent;
+}
+.wrt-modern *,
+.wrt-modern *::before,
+.wrt-modern *::after {
+    box-sizing: border-box;
+}
+
+/* ---------- Horizontal & Vertical shared nav/panel shell ---------- */
+.wrt-modern__nav {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.wrt-modern__tab {
+    appearance: none;
+    background: var(--wrt-inactive-bg, #00aadd);
+    color: var(--wrt-tab-color, #ffffff);
+    border: 1px solid var(--wrt-border-color, #81d742);
+    cursor: pointer;
+    font: inherit;
+    padding: 10px 16px;
+    white-space: nowrap;
+    transition: background-color .15s ease, color .15s ease;
+}
+.wrt-modern__tab:hover {
+    background: var(--wrt-active-bg, #ffffff);
+    color: var(--wrt-active-color, #428bca);
+}
+.wrt-modern__tab[aria-selected="true"] {
+    background: var(--wrt-active-bg, #ffffff);
+    color: var(--wrt-active-color, #428bca);
+}
+.wrt-modern__tab:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px rgba(66, 139, 202, .5);
+}
+.wrt-modern__tab:focus:not(:focus-visible) {
+    outline: none;
+}
+.wrt-modern__more-btn:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px rgba(66, 139, 202, .5);
+}
+.wrt-modern__more-btn:focus:not(:focus-visible) {
+    outline: none;
+}
+.wrt-modern__panels {
+    border: 1px solid var(--wrt-border-color, #81d742);
+    border-top: none;
+    background: var(--wrt-active-bg, #ffffff);
+}
+.wrt-modern__panel {
+    display: none;
+    padding: 16px;
+    color: var(--wrt-content-color, #000000);
+}
+.wrt-modern__panel.is-active {
+    display: block;
+}
+.wrt-modern__panel .wrt-modern__loading {
+    opacity: .6;
+    font-style: italic;
+}
+.wrt-modern__spinner {
+    width: 26px;
+    height: 26px;
+    margin: 24px auto;
+    border-radius: 50%;
+    border: 3px solid rgba(0, 0, 0, .12);
+    border-top-color: var(--wrt-active-color, #428bca);
+    animation: wrt-modern-spin .7s linear infinite;
+}
+@keyframes wrt-modern-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ---------- Horizontal ---------- */
+.wrt-modern--horizontal {
+    position: relative;
+    isolation: isolate;
+}
+.wrt-modern--horizontal .wrt-modern__nav {
+    overflow: hidden;
+    flex-wrap: nowrap;
+    border-bottom: 1px solid var(--wrt-border-color, #81d742);
+    position: relative;
+}
+.wrt-modern__more-btn {
+    display: none;
+    flex: 0 0 auto;
+    border: 1px solid var(--wrt-border-color, #81d742);
+    background: var(--wrt-inactive-bg, #00aadd);
+    color: var(--wrt-tab-color, #ffffff);
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    white-space: nowrap;
+}
+.wrt-modern__more-btn.is-visible {
+    display: block;
+}
+.wrt-modern__more-btn:hover {
+    background: var(--wrt-active-bg, #ffffff);
+    color: var(--wrt-active-color, #428bca);
+}
+.wrt-modern__more-menu {
+    display: none;
+    position: absolute;
+    top: 0;
+    right: 0;
+    min-width: 200px;
+    max-height: 320px;
+    overflow-y: auto;
+    background-color: #ffffff !important;
+    border: 1px solid var(--wrt-border-color, #81d742);
+    z-index: 999;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, .12);
+}
+.wrt-modern__more-menu.is-open {
+    display: block;
+}
+.wrt-modern__more-menu .wrt-modern__tab {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-bottom: 1px solid var(--wrt-border-color, #81d742);
+    position: relative;
+    z-index: 1;
+    background-color: #ffffff;
+    background-image: linear-gradient(var(--wrt-inactive-bg, #ffffff), var(--wrt-inactive-bg, #ffffff));
+    color: var(--wrt-tab-color, #1e1e1e);
+}
+.wrt-modern__more-menu .wrt-modern__tab:hover,
+.wrt-modern__more-menu .wrt-modern__tab[aria-selected="true"] {
+    background-color: #ffffff;
+    background-image: linear-gradient(var(--wrt-active-bg, #f0f0f1), var(--wrt-active-bg, #f0f0f1));
+    color: var(--wrt-active-color, #428bca);
+}
+.wrt-modern__more-menu .wrt-modern__tab:last-child {
+    border-bottom: none;
+}
+.wrt-modern--horizontal .wrt-modern__tab {
+    flex: 0 0 auto;
+    border-right: none;
+}
+.wrt-modern--horizontal .wrt-modern__tab:first-child {
+    border-top-left-radius: 3px;
+}
+.wrt-modern--horizontal .wrt-modern__tab:last-child {
+    border-right: 1px solid var(--wrt-border-color, #81d742);
+}
+.wrt-modern__active-cover {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    background: var(--wrt-active-bg, #ffffff);
+    pointer-events: none;
+    z-index: 2;
+}
+.wrt-modern--horizontal .wrt-modern__active-cover,
+.wrt-modern--vertical .wrt-modern__active-cover {
+    display: block;
+}
+
+/* ---------- Vertical ---------- */
+.wrt-modern--vertical {
+    display: flex;
+    align-items: stretch;
+    position: relative;
+    overflow: hidden;
+}
+.wrt-modern--vertical .wrt-modern__nav {
+    flex-direction: column;
+    flex: 0 0 220px;
+}
+.wrt-modern--vertical .wrt-modern__tab {
+    border-bottom: none;
+    border-right: none;
+    text-align: left;
+}
+.wrt-modern--vertical .wrt-modern__tab:last-child {
+    border-bottom: 1px solid var(--wrt-border-color, #81d742);
+}
+.wrt-modern--vertical .wrt-modern__panels {
+    flex: 1 1 auto;
+    border-left: 1px solid var(--wrt-border-color, #81d742);
+    border-top: 1px solid var(--wrt-border-color, #81d742);
+}
+@media only screen and (max-width: 768px) {
+    .wrt-modern--vertical.wrt-modern--mobile-accordion {
+        flex-direction: column;
+        overflow: visible;
+    }
+    .wrt-modern--vertical.wrt-modern--mobile-accordion .wrt-modern__nav {
+        flex-direction: column;
+        overflow: visible;
+        border-bottom: none;
+        width: 100%;
+        flex: 1 1 auto;
+    }
+    .wrt-modern--vertical.wrt-modern--mobile-accordion .wrt-modern__tab {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: 1px solid var(--wrt-border-color, #81d742);
+        border-top: none;
+        position: relative;
+    }
+    .wrt-modern--vertical.wrt-modern--mobile-accordion .wrt-modern__tab:first-child {
+        border-top: 1px solid var(--wrt-border-color, #81d742);
+    }
+    .wrt-modern--vertical.wrt-modern--mobile-accordion .wrt-modern__tab::after {
+        content: "+";
+        position: absolute;
+        right: 16px;
+    }
+    .wrt-modern--vertical.wrt-modern--mobile-accordion .wrt-modern__tab[aria-selected="true"]::after {
+        content: "\2212";
+    }
+    .wrt-modern--vertical.wrt-modern--mobile-accordion .wrt-modern__panel {
+        border: 1px solid var(--wrt-border-color, #81d742);
+        border-top: none;
+        background: var(--wrt-active-bg, #ffffff);
+    }
+    .wrt-modern--vertical.wrt-modern--mobile-accordion .wrt-modern__panels {
+        display: none;
+    }
+    .wrt-modern--vertical.wrt-modern--mobile-accordion .wrt-modern__active-cover {
+        display: none;
+    }
+}
+
+/* ---------- Accordion ---------- */
+.wrt-modern--accordion .wrt-modern__item {
+    border: 1px solid var(--wrt-border-color, #81d742);
+    border-top: none;
+}
+.wrt-modern--accordion .wrt-modern__item:first-child {
+    border-top: 1px solid var(--wrt-border-color, #81d742);
+}
+.wrt-modern--accordion .wrt-modern__tab {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    position: relative;
+}
+.wrt-modern--accordion .wrt-modern__tab::after {
+    content: "+";
+    position: absolute;
+    right: 16px;
+}
+.wrt-modern--accordion .wrt-modern__tab[aria-selected="true"]::after {
+    content: "\2212";
+}
+.wrt-modern--accordion .wrt-modern__panel {
+    border: none;
+    background: var(--wrt-active-bg, #ffffff);
+}
+
+
+
+/* Dropdown ("More") menu rows always stay plain rectangles, regardless
+   of any other border-radius rule elsewhere in this file. Placed at the
+   very end of the stylesheet — with equal specificity + !important on
+   both sides, source order is the only remaining tiebreaker, so this has
+   to be last to reliably win. */
+.wrt-modern__more-menu .wrt-modern__tab {
+    border-radius: 0 !important;
+}

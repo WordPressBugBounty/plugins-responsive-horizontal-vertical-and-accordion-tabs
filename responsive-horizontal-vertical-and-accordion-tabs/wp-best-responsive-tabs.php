@@ -5,7 +5,7 @@
  * Plugin URI:https://www.i13websolution.com
  * Description:This is beautiful responsive all in one tabs for wordpress sites/blogs. Add any number of tabs sets to your site. your tabs sets will be ready within few min. 
  * Author:I Thirteen Web Solution 
- * Version:1.1.20
+ * Version:1.6.31
  * Text Domain:responsive-horizontal-vertical-and-accordion-tabs
  * Domain Path: /languages
  */
@@ -18,12 +18,154 @@ add_action ( 'admin_menu', 'wrt_responsive_tabs_add_admin_menu' );
 register_activation_hook ( __FILE__, 'wrt_wp_responsive_tabs_install' );
 register_deactivation_hook(__FILE__,'wrt_wp_responsive_tabs_remove_access_capabilities');
 add_action ( 'wp_enqueue_scripts', 'wrt_wp_responsive_tabs_load_styles_and_js' );
+add_action ( 'admin_enqueue_scripts', 'wrt_wp_responsive_tabs_register_modern_assets' );
 add_shortcode ( 'wrt_print_rt_wp_responsive_tabs', 'wrt_print_rt_wp_responsive_tabs_func' );
 add_action('plugins_loaded', 'wrt_lang_for_wp_responsive_tabs');
 add_action('wp_ajax_rt_get_tab_data_byid', 'wp_ajax_rt_get_tab_data_byid_callback');
 add_action('wp_ajax_nopriv_rt_get_tab_data_byid', 'wp_ajax_rt_get_tab_data_byid_callback');
 add_filter( 'user_has_cap', 'wrt_wp_responsive_tabs_admin_cap_list' , 10, 4 );
+add_action( 'init', 'wrt_register_responsive_tabs_block' );
+add_action( 'enqueue_block_editor_assets', 'wrt_enqueue_responsive_tabs_block_assets' );
 //add_action( 'upgrader_process_complete', 'wrt_wp_responsive_tabs_func',10, 2);
+
+
+/**
+ * Shared PRO upgrade box, replacing the old donate button / affiliate
+ * banners / Facebook widget across every admin screen.
+ */
+/**
+ * Gutenberg block: a lightweight tab-set picker. The block itself only
+ * stores which tab set + scroll option to use; actual tab content/colors
+ * stay managed on the plugin's own admin screens (same pattern as the
+ * rest of the portfolio's blocks).
+ */
+function wrt_register_responsive_tabs_block() {
+    register_block_type( 'wrt/responsive-tabs', array(
+        'attributes' => array(
+            'tabsetId' => array( 'type' => 'number', 'default' => 0 ),
+            'scroll'   => array( 'type' => 'boolean', 'default' => true ),
+        ),
+        'render_callback' => 'wrt_render_responsive_tabs_block',
+    ) );
+}
+
+function wrt_render_responsive_tabs_block( $attributes ) {
+    $tabset_id = isset( $attributes['tabsetId'] ) ? intval( $attributes['tabsetId'] ) : 0;
+    if ( $tabset_id <= 0 ) {
+        return '';
+    }
+    $scroll = ( isset( $attributes['scroll'] ) && ! $attributes['scroll'] ) ? 0 : 1;
+    return wrt_print_rt_wp_responsive_tabs_func( array( 'tabset_id' => $tabset_id, 'scroll' => $scroll ) );
+}
+
+function wrt_enqueue_responsive_tabs_block_assets() {
+    $block_js_path = __DIR__ . '/blocks/wrt-tabs-block.js';
+    $block_ver = file_exists( $block_js_path ) ? filemtime( $block_js_path ) : '1.3.2';
+
+    wp_register_script(
+        'wrt-tabs-block',
+        plugins_url( '/blocks/wrt-tabs-block.js', __FILE__ ),
+        array( 'wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-i18n' ),
+        $block_ver,
+        true
+    );
+
+    global $wpdb;
+    $rows = $wpdb->get_results( "SELECT id, name, type, engine FROM " . $wpdb->prefix . "wrt_tabs_settings ORDER BY createdon DESC", ARRAY_A );
+    $tab_sets = array();
+    if ( is_array( $rows ) ) {
+        foreach ( $rows as $row ) {
+            $tab_sets[] = array(
+                'id'     => intval( $row['id'] ),
+                'name'   => sanitize_text_field( $row['name'] ),
+                'type'   => intval( $row['type'] ),
+                'engine' => isset( $row['engine'] ) && $row['engine'] === 'modern' ? 'modern' : 'legacy',
+            );
+        }
+    }
+
+    wp_add_inline_script(
+        'wrt-tabs-block',
+        'window.wrtTabsBlockData = ' . wp_json_encode( array(
+            'tabSets'   => $tab_sets,
+            'manageUrl' => admin_url( 'admin.php?page=rt_wp_responsive_tabs' ),
+        ) ) . ';',
+        'before'
+    );
+
+    wp_enqueue_script( 'wrt-tabs-block' );
+}
+
+
+/**
+ * Free-tier tab set limit. Existing tab sets created before this limit
+ * (or by Pro users) are never touched — this only blocks creating brand
+ * new ones once the cap is reached.
+ */
+define( 'WRT_FREE_TABSET_LIMIT', 3 );
+
+function wrt_responsive_tabs_count_tab_sets() {
+    global $wpdb;
+    $table_name2 = $wpdb->prefix . 'wrt_tabs_settings';
+    return intval( $wpdb->get_var( "SELECT COUNT(*) FROM $table_name2" ) );
+}
+
+function wrt_responsive_tabs_limit_reached() {
+    return wrt_responsive_tabs_count_tab_sets() >= WRT_FREE_TABSET_LIMIT;
+}
+
+
+/**
+ * Renders a grayed-out, disabled control with a lock badge — used to
+ * advertise Pro-only options inline without touching anything the free
+ * version already does.
+ */
+/**
+ * Compact inline version of the lock badge, for table cells / action
+ * links rather than a full settings box.
+ */
+function wrt_render_locked_pro_inline( $label ) {
+    ?>
+    <span title="<?php echo esc_attr__('Available in Pro','responsive-horizontal-vertical-and-accordion-tabs'); ?>" style="opacity:0.55;cursor:not-allowed;white-space:nowrap;">
+        <span class="dashicons dashicons-lock" style="font-size:14px;width:14px;height:14px;vertical-align:text-bottom;"></span>
+        <?php echo esc_html( $label ); ?>
+    </span>
+    <?php
+}
+
+
+function wrt_render_locked_pro_field( $label, $description = '' ) {
+    ?>
+    <div class="stuffbox" style="width:100%;opacity:0.55;position:relative;">
+        <h3>
+            <label>
+                <span class="dashicons dashicons-lock" style="font-size:16px;width:16px;height:16px;vertical-align:text-bottom;"></span>
+                <?php echo esc_html( $label ); ?>
+                <span style="background:#f0b849;color:#1d2327;font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 6px;border-radius:3px;margin-left:6px;">PRO</span>
+            </label>
+        </h3>
+        <div class="inside" style="pointer-events:none;">
+            <?php if ( $description ) : ?>
+                <div style="clear:both;font-size:12px;color:black;margin-bottom:6px;"><?php echo esc_html( $description ); ?></div>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php
+}
+
+
+function wrt_render_pro_upgrade_box() {
+    ?>
+    <div class="postbox">
+        <div class="inside" style="text-align:center;padding:20px 16px;">
+            <span class="dashicons dashicons-star-filled" style="color:#f0b849;font-size:32px;width:32px;height:32px;"></span>
+            <h3 style="margin:10px 0 6px;"><?php echo __('Upgrade to Pro','responsive-horizontal-vertical-and-accordion-tabs'); ?></h3>
+            <p style="color:#50575e;margin:0 0 14px;"><?php echo __('Get more tab styles, extra customization options, and priority support.','responsive-horizontal-vertical-and-accordion-tabs'); ?></p>
+            <a href="https://www.i13websolution.com/product/best-wordpress-responsive-tabs-plugin/" target="_blank" class="button button-primary"><?php echo __('Upgrade Now','responsive-horizontal-vertical-and-accordion-tabs'); ?></a>
+        </div>
+    </div>
+    <?php
+}
 
 
 function wrt_lang_for_wp_responsive_tabs() {
@@ -289,9 +431,34 @@ function wrt_wp_responsive_tabs_load_styles_and_js() {
             wp_register_style ( 'wrt_easy-responsive-tabs', plugins_url ( '/css/wrt_easy-responsive-tabs.css', __FILE__ ),array(),'1.1.15' );
             wp_register_script ( 'wrt_bootstrap-nva-only.min', plugins_url ( '/js/wrt_bootstrap-nva-only.min.js', __FILE__ ),array('jquery'),'1.1.9' );
             wp_register_script ( 'wrt_jquery.easyResponsiveTabs', plugins_url ( '/js/wrt_jquery.easyResponsiveTabs.js', __FILE__ ),array('jquery'),'1.1.9' );
-            
+
+            wp_register_style ( 'wrt-modern-tabs', plugins_url ( '/css/wrt-modern-tabs.css', __FILE__ ),array(), wrt_modern_assets_version('css') );
+            wp_register_script ( 'wrt-modern-tabs', plugins_url ( '/js/wrt-modern-tabs.js', __FILE__ ),array(), wrt_modern_assets_version('js'), true );
 
        }
+}
+
+/**
+ * filemtime()-based version string for the Modern engine's CSS/JS, so
+ * every edit to those files automatically busts the cache — no more
+ * relying on remembering to bump a hardcoded version number (which is
+ * exactly what silently kept old cached copies alive across several
+ * rounds of fixes).
+ */
+function wrt_modern_assets_version( $type ) {
+    $path = __DIR__ . '/' . $type . '/wrt-modern-tabs.' . $type;
+    return file_exists( $path ) ? filemtime( $path ) : '1.2.0';
+}
+
+/**
+ * The Modern engine's assets are registered on 'wp_enqueue_scripts', which
+ * never fires on wp-admin pages. Register them separately on
+ * 'admin_enqueue_scripts' too, so admin screens that render a live tab set
+ * (e.g. the Preview Tabs page) have something to enqueue.
+ */
+function wrt_wp_responsive_tabs_register_modern_assets() {
+    wp_register_style ( 'wrt-modern-tabs', plugins_url ( '/css/wrt-modern-tabs.css', __FILE__ ),array(), wrt_modern_assets_version('css') );
+    wp_register_script ( 'wrt-modern-tabs', plugins_url ( '/js/wrt-modern-tabs.js', __FILE__ ),array(), wrt_modern_assets_version('js'), true );
 }
 function wrt_wp_responsive_tabs_install() {
     
@@ -341,6 +508,11 @@ function wrt_wp_responsive_tabs_install() {
            $wpdb->query("ALTER TABLE $table_name2 ADD `additional_css` text  DEFAULT NULL ");
         }
         
+        if(wrt_table_column_exists($table_name2,'engine')==false){
+            
+           $wpdb->query("ALTER TABLE $table_name2 ADD `engine` varchar(10) NOT NULL DEFAULT 'legacy' ");
+        }
+        
         wrt_wp_responsive_tabs_add_access_capabilities();
 
         
@@ -368,6 +540,11 @@ function wrt_update_required_fields() {
         $wpdb->query("ALTER TABLE $table_name2 ADD `additional_css` text  DEFAULT NULL ");
      }
 
+     if(wrt_table_column_exists($table_name2,'engine')==false){
+
+        $wpdb->query("ALTER TABLE $table_name2 ADD `engine` varchar(10) NOT NULL DEFAULT 'legacy' ");
+     }
+
 }
 
 
@@ -387,7 +564,7 @@ function wrt_table_column_exists( $table_name, $column_name ) {
  
 function wrt_responsive_tabs_add_admin_menu() {
     
-	$hook_suffix = add_menu_page ( __( 'Responsive Tabs','responsive-horizontal-vertical-and-accordion-tabs') , __ ( 'Responsive Tabs','responsive-horizontal-vertical-and-accordion-tabs' ), 'wrt_responsive_tabs_view_tab_sets', 'rt_wp_responsive_tabs', 'rt_wp_responsive_wp_admin_options_func' );
+	$hook_suffix = add_menu_page ( __( 'Responsive Tabs','responsive-horizontal-vertical-and-accordion-tabs') , __ ( 'Responsive Tabs','responsive-horizontal-vertical-and-accordion-tabs' ), 'wrt_responsive_tabs_view_tab_sets', 'rt_wp_responsive_tabs', 'rt_wp_responsive_wp_admin_options_func', 'dashicons-index-card', 26 );
 	$hook_suffix=add_submenu_page ( 'rt_wp_responsive_tabs', __ ( 'Tab Sets','responsive-horizontal-vertical-and-accordion-tabs' ), __ ( 'Tab Sets','responsive-horizontal-vertical-and-accordion-tabs' ), 'wrt_responsive_tabs_view_tab_sets', 'rt_wp_responsive_tabs', 'rt_wp_responsive_wp_admin_options_func' );
 	$hook_suffix_image=add_submenu_page ( 'rt_wp_responsive_tabs', __ ( 'Manage Tabs','responsive-horizontal-vertical-and-accordion-tabs' ), __ ( 'Manage Tabs','responsive-horizontal-vertical-and-accordion-tabs' ), 'wrt_responsive_tabs_view_tabs', 'rt_wp_responsive_tabs_management', 'rt_wp_responsive_tabs_data_management' );
 	$hook_suffix_prev=add_submenu_page ( 'rt_wp_responsive_tabs', __ ( 'Preview Slider','responsive-horizontal-vertical-and-accordion-tabs' ), __ ( 'Preview Tabs','responsive-horizontal-vertical-and-accordion-tabs' ), 'wrt_responsive_tabs_preview_tab_set', 'rt_wp_responsive_tabs_preview', 'wrt_rt_wp_responsive_tabs_preview_func' );
@@ -428,9 +605,143 @@ function wp_ajax_rt_get_tab_data_byid_callback(){
             $description=$row['tab_description'];
         }
         
-      echo do_shortcode(wp_unslash($description));
+      // wp_enqueue_script()/wp_enqueue_style() calls made by a shortcode
+      // here (do_shortcode, below) happen far too late for WordPress's
+      // normal wp_head()/wp_footer() printing — those already ran before
+      // this AJAX request was even made, so anything a shortcode enqueues
+      // as a side effect would otherwise silently never load. Worse: many
+      // plugins only *register* their scripts inside a function hooked to
+      // 'wp_enqueue_scripts', which never fires at all during an
+      // admin-ajax.php request (that hook is front-end-page-load only) —
+      // so an enqueue call for an unregistered handle is silently
+      // dropped. Firing it here (admin-ajax.php never does) lets those
+      // plugins register normally, then we snapshot the queues
+      // before/after do_shortcode() and manually print just what's new.
+      if ( ! did_action( 'wp_enqueue_scripts' ) ) {
+          do_action( 'wp_enqueue_scripts' );
+      }
+
+      global $wp_scripts, $wp_styles;
+      $scripts_before = ( $wp_scripts instanceof WP_Scripts ) ? $wp_scripts->queue : array();
+      $styles_before  = ( $wp_styles instanceof WP_Styles ) ? $wp_styles->queue : array();
+
+      $content = do_shortcode(wp_unslash($description));
+
+      // Excludes jQuery itself (and core variants) — see the matching
+      // note in wrt_rest_render_tab_content() for why. Marking it "done"
+      // (not just excluding it from the list) matters because
+      // do_items() walks the full dependency tree regardless.
+      $always_loaded = array( 'jquery', 'jquery-core', 'jquery-migrate' );
+      if ( $wp_scripts instanceof WP_Scripts ) {
+          foreach ( $always_loaded as $handle ) {
+              if ( ! in_array( $handle, $wp_scripts->done, true ) ) {
+                  $wp_scripts->done[] = $handle;
+              }
+          }
+      }
+
+      $extra_assets = '';
+      if ( $wp_styles instanceof WP_Styles ) {
+          $new_styles = array_diff( $wp_styles->queue, $styles_before );
+          if ( ! empty( $new_styles ) ) {
+              ob_start();
+              wp_styles()->do_items( $new_styles );
+              $extra_assets .= ob_get_clean();
+          }
+      }
+      if ( $wp_scripts instanceof WP_Scripts ) {
+          $new_scripts = array_diff( $wp_scripts->queue, $scripts_before, $always_loaded );
+          if ( ! empty( $new_scripts ) ) {
+              ob_start();
+              wp_scripts()->do_items( $new_scripts );
+              $extra_assets .= ob_get_clean();
+          }
+      }
+
+      echo $content . $extra_assets;
       exit;
  
+}
+
+// Public — used by the Modern engine's front-end AJAX tab loading (see
+// wrt-modern-tabs.js). Deliberately NOT admin-ajax.php: that endpoint
+// always reports is_admin() === true (a PHP constant it defines, not
+// overridable via hooks), which causes any third-party shortcode/widget
+// that guards its own script registration behind `if ( ! is_admin() )`
+// — a common pattern — to silently never register, so its enqueue calls
+// have nothing to attach to. REST API requests don't set that constant,
+// so those plugins register normally here.
+add_action( 'rest_api_init', function () {
+    register_rest_route( 'wrt/v1', '/tab-render/(?P<id>\d+)', array(
+        'methods'             => 'GET',
+        'callback'            => 'wrt_rest_render_tab_content',
+        'permission_callback' => '__return_true',
+    ) );
+} );
+
+function wrt_rest_render_tab_content( $request ) {
+    global $wpdb;
+    $tab_id = intval( $request['id'] );
+
+    $row = $wpdb->get_row( $wpdb->prepare( "SELECT tab_description FROM " . $wpdb->prefix . "wrt_tabs WHERE id=%d", $tab_id ), ARRAY_A );
+    $description = ( is_array( $row ) && isset( $row['tab_description'] ) ) ? $row['tab_description'] : '';
+
+    if ( class_exists( 'WPBMap' ) ) {
+        WPBMap::addAllMappedShortcodes();
+    }
+
+    // Many shortcodes/widgets only register their scripts/styles inside a
+    // function hooked to 'wp_enqueue_scripts' — REST requests don't go
+    // through normal front-end template loading, so that hook needs
+    // firing manually here too (same reasoning as the is_admin() note
+    // above, but this half is just "hook never fired", not "blocked").
+    if ( ! did_action( 'wp_enqueue_scripts' ) ) {
+        do_action( 'wp_enqueue_scripts' );
+    }
+
+    global $wp_scripts, $wp_styles;
+    $scripts_before = ( $wp_scripts instanceof WP_Scripts ) ? $wp_scripts->queue : array();
+    $styles_before  = ( $wp_styles instanceof WP_Styles ) ? $wp_styles->queue : array();
+
+    $content = do_shortcode( wp_unslash( $description ) );
+
+    // Excludes jQuery itself (and core variants): this REST request runs
+    // as a separate PHP process from the original page load, so
+    // $wp_scripts starts empty here and doesn't know jQuery is already
+    // loaded in the browser. Re-printing it would create a second,
+    // brand-new jQuery object that silently replaces the browser's
+    // original one — wiping out any plugin (like .vTicker) a script
+    // just finished attaching to it. Marking it "done" (not just
+    // excluding it from the explicit list) matters because do_items()
+    // walks the full dependency tree regardless of that list.
+    $always_loaded = array( 'jquery', 'jquery-core', 'jquery-migrate' );
+    if ( $wp_scripts instanceof WP_Scripts ) {
+        foreach ( $always_loaded as $handle ) {
+            if ( ! in_array( $handle, $wp_scripts->done, true ) ) {
+                $wp_scripts->done[] = $handle;
+            }
+        }
+    }
+
+    $extra_assets = '';
+    if ( $wp_styles instanceof WP_Styles ) {
+        $new_styles = array_diff( $wp_styles->queue, $styles_before );
+        if ( ! empty( $new_styles ) ) {
+            ob_start();
+            wp_styles()->do_items( $new_styles );
+            $extra_assets .= ob_get_clean();
+        }
+    }
+    if ( $wp_scripts instanceof WP_Scripts ) {
+        $new_scripts = array_diff( $wp_scripts->queue, $scripts_before, $always_loaded );
+        if ( ! empty( $new_scripts ) ) {
+            ob_start();
+            wp_scripts()->do_items( $new_scripts );
+            $extra_assets .= ob_get_clean();
+        }
+    }
+
+    return new WP_REST_Response( array( 'html' => $content . $extra_assets ), 200 );
 }
 
 function rt_wp_responsive_wp_admin_options_func() {
@@ -487,27 +798,6 @@ function rt_wp_responsive_wp_admin_options_func() {
                 <div id="post-body" class="metabox-holder columns-2" >  
                   
                        <div id="post-body-content">
-                           <table><tr>
-                                <td>
-                                    <div class="fb-like" data-href="https://www.facebook.com/i13websolution" data-layout="button" data-action="like" data-size="large" data-show-faces="false" data-share="false"></div>
-                                    <div id="fb-root"></div>
-                                      <script>(function(d, s, id) {
-                                        var js, fjs = d.getElementsByTagName(s)[0];
-                                        if (d.getElementById(id)) return;
-                                        js = d.createElement(s); js.id = id;
-                                        js.src = 'https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v3.2&appId=158817690866061&autoLogAppEvents=1';
-                                        fjs.parentNode.insertBefore(js, fjs);
-                                      }(document, 'script', 'facebook-jssdk'));</script>
-                                </td>   
-                                <td>
-                                    <a target="_blank" title="Donate" href="http://www.i13websolution.com/donate-wordpress_image_thumbnail.php">
-                                        <img id="help us for free plugin" height="30" width="90" src="<?php echo plugins_url( 'images/paypaldonate.jpg', __FILE__ ) ;?>" border="0" alt="help us for free plugin" title="help us for free plugin">
-                                    </a>
-                                </td>
-                            </tr>
-                        </table>
-                          <h3 style="color: blue;"><a target="_blank" href="https://www.i13websolution.com/product/best-wordpress-responsive-tabs-plugin/"><?php echo __('UPGRADE TO PRO VERSION','responsive-horizontal-vertical-and-accordion-tabs');?></a></h3>
-   
                          <?php
                             $messages = get_option ( 'wrt_responsive_tabs_msg' );
                             $type = '';
@@ -527,8 +817,17 @@ function rt_wp_responsive_wp_admin_options_func() {
                                 <div class="icon32 icon32-posts-post" id="icon-edit">
                                             <br>
                                     </div>
-                                    <h2>
-                                            <?php echo __('Manage Tab Sets','responsive-horizontal-vertical-and-accordion-tabs');?> <a class="button add-new-h2"href="admin.php?page=rt_wp_responsive_tabs&action=addedit"><?php echo __('Add New','responsive-horizontal-vertical-and-accordion-tabs');?></a>
+                                    <h2 style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;">
+                                            <span><?php echo __('Manage Tab Sets','responsive-horizontal-vertical-and-accordion-tabs');?></span>
+                                            <?php if ( wrt_responsive_tabs_limit_reached() ) : ?>
+                                                <span class="button" disabled="disabled" style="opacity:0.5;cursor:not-allowed;" title="<?php echo esc_attr__('Free version is limited to 3 tab sets','responsive-horizontal-vertical-and-accordion-tabs'); ?>"><?php echo __('Add New','responsive-horizontal-vertical-and-accordion-tabs');?></span>
+                                                <a href="https://www.i13websolution.com/product/best-wordpress-responsive-tabs-plugin/" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#f0b849;color:#1d2327;font-size:13px;font-weight:600;text-decoration:none;padding:6px 12px;border-radius:3px;line-height:1;">
+                                                    <span class="dashicons dashicons-lock" style="font-size:16px;width:16px;height:16px;"></span>
+                                                    <?php echo __('Upgrade for unlimited tab sets','responsive-horizontal-vertical-and-accordion-tabs');?>
+                                                </a>
+                                            <?php else: ?>
+                                                <a class="button add-new-h2"href="admin.php?page=rt_wp_responsive_tabs&action=addedit"><?php echo __('Add New','responsive-horizontal-vertical-and-accordion-tabs');?></a>
+                                            <?php endif; ?>
                                     </h2>
                                     <br />
                                     
@@ -629,6 +928,7 @@ function rt_wp_responsive_wp_admin_options_func() {
                                                         <th><?php echo __("Shortcode",'responsive-horizontal-vertical-and-accordion-tabs');?></th>
                                                         <th><?php echo __("Manage Tabs",'responsive-horizontal-vertical-and-accordion-tabs');?></th>
                                                         <th><?php echo __("Edit",'responsive-horizontal-vertical-and-accordion-tabs');?></th>
+                                                        <th><?php echo __("Duplicate",'responsive-horizontal-vertical-and-accordion-tabs');?></th>
                                                         <th><?php echo __("Delete",'responsive-horizontal-vertical-and-accordion-tabs');?></th>
                                                 </tr>
                                         </thead>
@@ -694,13 +994,14 @@ function rt_wp_responsive_wp_admin_options_func() {
                                                                                             <td class="alignCenter" data-title="<?php echo __("ShortCode",'responsive-horizontal-vertical-and-accordion-tabs');?>" scope="col"><span><input type="text" spellcheck="false" onclick="this.focus(); this.select()" readonly="readonly" style="width: 100%; height: 29px; background-color: #EEEEEE" value='[wrt_print_rt_wp_responsive_tabs tabset_id="<?php echo intval($row->id); ?>"  <?php if($row->type==2 || $row->type==5):?> scroll="1" <?php endif;?>]'></span></td>
                                                                                             <td class="alignCenter" data-title="<?php echo __("Manage Tabs",'responsive-horizontal-vertical-and-accordion-tabs');?>" scope="col"><strong><a href='<?php echo $manageMedia; ?>' title="<?php echo __("Manage Tabs",'responsive-horizontal-vertical-and-accordion-tabs');?>"><?php echo __("Manage Tabs",'responsive-horizontal-vertical-and-accordion-tabs');?></a></strong></td>
                                                                                             <td class="alignCenter" data-title="<?php echo __("Edit",'responsive-horizontal-vertical-and-accordion-tabs');?>"><strong><a href='<?php echo esc_html($editlink); ?>' title="<?php echo __("Edit",'responsive-horizontal-vertical-and-accordion-tabs');?>"><?php echo __("Edit",'responsive-horizontal-vertical-and-accordion-tabs');?></a></strong></td>
+                                                                                            <td class="alignCenter" data-title="<?php echo __("Duplicate",'responsive-horizontal-vertical-and-accordion-tabs');?>"><?php wrt_render_locked_pro_inline( __('Duplicate', 'responsive-horizontal-vertical-and-accordion-tabs') ); ?></td>
                                                                                             <td class="alignCenter" data-title="<?php echo __("Delete",'responsive-horizontal-vertical-and-accordion-tabs');?>"><strong><a  href='<?php echo esc_html($deletelink); ?>' onclick="return confirmDelete();" title="<?php echo __("Delete",'responsive-horizontal-vertical-and-accordion-tabs');?>"><?php echo __("Delete",'responsive-horizontal-vertical-and-accordion-tabs');?></a> </strong></td>
                                                                                     </tr>
                                                                         <?php
                                                     }
                                             } else {
                                                     ?><tr valign="top" id="">
-                                                            <td colspan="9" data-title="<?php echo __("No Records",'responsive-horizontal-vertical-and-accordion-tabs');?>" align="center"><strong><?php echo __("No Tab Sets Found",'responsive-horizontal-vertical-and-accordion-tabs');?></strong></td>
+                                                            <td colspan="10" data-title="<?php echo __("No Records",'responsive-horizontal-vertical-and-accordion-tabs');?>" align="center"><strong><?php echo __("No Tab Sets Found",'responsive-horizontal-vertical-and-accordion-tabs');?></strong></td>
                                                     </tr>
                                         <?php
                                             }
@@ -760,27 +1061,7 @@ function rt_wp_responsive_wp_admin_options_func() {
                                <div id="postbox-container-1" class="postbox-container"> 
                    
 
-                                <div class="postbox"> 
-                                    <h3 class="hndle"><span></span><?php echo __('Access All Themes One price','responsive-horizontal-vertical-and-accordion-tabs'); ?></h3> 
-                                    <div class="inside">
-                                        <center><a href="http://www.elegantthemes.com/affiliates/idevaffiliate.php?id=11715_0_1_10" target="_blank"><img border="0" src="<?php echo plugins_url( 'images/300x250.gif', __FILE__ );?>" width="250" height="250"></a></center>
-
-                                        <div style="margin:10px 5px">
-
-                                        </div>
-                                    </div></div>
-
-                                 <div class="postbox"> 
-                                    <h3 class="hndle"><span></span><?php echo __('Google For Business Coupon','responsive-horizontal-vertical-and-accordion-tabs');?></h3> 
-                                        <div class="inside">
-                                            <center><a href="https://goo.gl/OJBuHT" target="_blank">
-                                                    <img src="<?php echo plugins_url( 'images/g-suite-promo-code-4.png', __FILE__ );?>" width="250" height="250" border="0">
-                                                </a></center>
-                                            <div style="margin:10px 5px">
-                                            </div>
-                                        </div>
-
-                                    </div>
+                                <?php wrt_render_pro_upgrade_box(); ?>
                             </div> 
                             
                             <?php $url = plugin_dir_url(__FILE__); ?>
@@ -809,6 +1090,7 @@ function rt_wp_responsive_wp_admin_options_func() {
             $tab_ccolor=sanitize_text_field($_POST['tab_ccolor']); 
             $type=intval($_POST['type']); 
             $additional_css=sanitize_textarea_field($_POST['additional_css']);  
+            $engine=(isset($_POST['engine']) and sanitize_text_field($_POST['engine'])=='modern') ? 'modern' : 'legacy';
            
              $use_ajax=0;
              if(isset($_POST['use_ajax'])){
@@ -863,12 +1145,13 @@ function rt_wp_responsive_wp_admin_options_func() {
                                         'tab_ccolor'=>$tab_ccolor,
                                         'use_ajax'=>$use_ajax,
                                         'additional_css'=>$additional_css,
+                                        'engine'=>$engine,
 
                                     ),
                                    array( 
                                     'id' => $tabid,          // where clause(s)
                                    ), 
-                                   array( '%s','%d','%s','%s','%s','%s','%s','%s','%d','%s' ),
+                                   array( '%s','%d','%s','%s','%s','%s','%s','%s','%d','%s','%s' ),
                                    array( 
                                             '%d'
                                     )
@@ -893,6 +1176,18 @@ function rt_wp_responsive_wp_admin_options_func() {
                             exit;   
 
                          }
+
+                        if ( wrt_responsive_tabs_limit_reached() ) {
+
+                            $location='admin.php?page=rt_wp_responsive_tabs';
+                            $wrt_responsive_tabs_msg=array();
+                            $wrt_responsive_tabs_msg['type']='err';
+                            $wrt_responsive_tabs_msg['message']=sprintf( __('The free version is limited to %d tab sets. Your existing tab sets are unaffected — upgrade to Pro for unlimited tab sets.','responsive-horizontal-vertical-and-accordion-tabs'), WRT_FREE_TABSET_LIMIT );
+                            update_option('wrt_responsive_tabs_msg', $wrt_responsive_tabs_msg);
+                            echo "<script type='text/javascript'> location.href='$location';</script>";
+                            exit;
+
+                         }
                          
                         
                          $wpdb->insert(
@@ -910,10 +1205,11 @@ function rt_wp_responsive_wp_admin_options_func() {
                                     'tab_ccolor'=>$tab_ccolor,
                                     'use_ajax'=>$use_ajax,
                                     'additional_css'=>$additional_css,
+                                    'engine'=>$engine,
                                     'createdon'=>$createdOn,
 
                                 ),
-                               array( '%s','%d','%s','%s','%s','%s','%s','%s','%d','%s','%s' )
+                               array( '%s','%d','%s','%s','%s','%s','%s','%s','%d','%s','%s','%s' )
                               
                             ); 
                          
@@ -965,7 +1261,8 @@ function rt_wp_responsive_wp_admin_options_func() {
                             'tab_ccolor'=>'#000000',
                             'type' =>'3',
                             'use_ajax' =>'0',
-                            'additional_css' =>''
+                            'additional_css' =>'',
+                            'engine' =>'modern'
                         );
                      
                      
@@ -985,7 +1282,8 @@ function rt_wp_responsive_wp_admin_options_func() {
                             'tab_ccolor' =>sanitize_text_field($settings_['tab_ccolor']),
                             'type' =>intval($settings_['type']),
                              'use_ajax' =>intval($settings_['use_ajax']),
-                            'additional_css' =>wp_unslash($settings_['additional_css'])
+                            'additional_css' =>wp_unslash($settings_['additional_css']),
+                            'engine' =>(isset($settings_['engine']) and $settings_['engine']=='modern') ? 'modern' : 'legacy'
                       
                         );
                       
@@ -1006,6 +1304,18 @@ function rt_wp_responsive_wp_admin_options_func() {
                         exit;   
 
                      }
+
+                   if ( wrt_responsive_tabs_limit_reached() ) {
+
+                        $location='admin.php?page=rt_wp_responsive_tabs';
+                        $wrt_responsive_tabs_msg=array();
+                        $wrt_responsive_tabs_msg['type']='err';
+                        $wrt_responsive_tabs_msg['message']=sprintf( __('The free version is limited to %d tab sets. Your existing tab sets are unaffected — upgrade to Pro for unlimited tab sets.','responsive-horizontal-vertical-and-accordion-tabs'), WRT_FREE_TABSET_LIMIT );
+                        update_option('wrt_responsive_tabs_msg', $wrt_responsive_tabs_msg);
+                        echo "<script type='text/javascript'> location.href='$location';</script>";
+                        exit;
+
+                     }
                  $settings=array(
                                 'name'=>'',
                                 'activetab_bg' => '#ffffff',
@@ -1016,7 +1326,8 @@ function rt_wp_responsive_wp_admin_options_func() {
                                 'tab_ccolor'=>'#000000',
                                 'type' =>'3',
                                 'use_ajax' =>'0',
-                                'additional_css' =>''
+                                'additional_css' =>'',
+                                'engine' =>'modern'
                         );
 
             }
@@ -1029,28 +1340,6 @@ function rt_wp_responsive_wp_admin_options_func() {
            <div id="post-body-content">
                  
                 <div class="wrap">
-                         <table>
-                             <tr>
-                                <td>
-                                   <div class="fb-like" data-href="https://www.facebook.com/i13websolution" data-layout="button" data-action="like" data-size="large" data-show-faces="false" data-share="false"></div>
-                                   <div id="fb-root"></div>
-                                     <script>(function(d, s, id) {
-                                       var js, fjs = d.getElementsByTagName(s)[0];
-                                       if (d.getElementById(id)) return;
-                                       js = d.createElement(s); js.id = id;
-                                       js.src = 'https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v3.2&appId=158817690866061&autoLogAppEvents=1';
-                                       fjs.parentNode.insertBefore(js, fjs);
-                                     }(document, 'script', 'facebook-jssdk'));</script>
-                               </td>
-                                <td>
-                                    <a target="_blank" title="Donate" href="http://www.i13websolution.com/donate-wordpress_image_thumbnail.php">
-                                        <img id="help us for free plugin" height="30" width="90" src="<?php echo plugins_url( 'images/paypaldonate.jpg', __FILE__ ) ;?>" border="0" alt="help us for free plugin" title="help us for free plugin">
-                                    </a>
-                                </td>
-                            </tr>
-                        </table>
-                          <span><h3 style="color: blue;"><a target="_blank" href="https://www.i13websolution.com/product/best-wordpress-responsive-tabs-plugin/"><?php echo __('UPGRADE TO PRO VERSION','responsive-horizontal-vertical-and-accordion-tabs');?></a></h3></span>
- 
                 <?php
                     $messages=get_option('wrt_responsive_tabs_msg'); 
                     $type='';
@@ -1108,7 +1397,7 @@ function rt_wp_responsive_wp_admin_options_func() {
                                                     <td>
                                                         <select name="type" id="type">
                                                             <option value=""><?php echo __( 'Select','responsive-horizontal-vertical-and-accordion-tabs');?></option>
-                                                            
+                                                            <option disabled="disabled">🔒 <?php echo __( 'Responsive Horizontal Scrollable Tabs (Pro)','responsive-horizontal-vertical-and-accordion-tabs');?></option>
                                                             <option <?php if ($settings['type'] == "4") { ?> selected="selected" <?php } ?> value="4"><?php echo __( 'Responsive Horizontal Tabs','responsive-horizontal-vertical-and-accordion-tabs');?></option>
                                                             <option <?php if ($settings['type'] == "2") { ?> selected="selected" <?php } ?> value="2"><?php echo __( 'Responsive Vertical Tabs','responsive-horizontal-vertical-and-accordion-tabs');?></option>
                                                             <option <?php if ($settings['type'] == "5") { ?> selected="selected" <?php } ?> value="5"><?php echo __( 'Responsive Accordion Tabs','responsive-horizontal-vertical-and-accordion-tabs');?></option>
@@ -1116,6 +1405,25 @@ function rt_wp_responsive_wp_admin_options_func() {
                                                             </select>
                                                         <div style="clear: both"></div>
                                                         <div></div>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                            <div style="clear:both"></div>
+
+                                        </div>
+                                    </div>
+                                    <div class="stuffbox" id="slider_easing" style="width:100%;">
+                                        <h3><label><?php echo __( 'Tab Engine','responsive-horizontal-vertical-and-accordion-tabs');?></label></h3>
+                                        <div class="inside">
+                                            <table>
+                                                <tr>
+                                                    <td>
+                                                        <select name="engine" id="engine">
+                                                            <option <?php if ($settings['engine'] == "modern") { ?> selected="selected" <?php } ?> value="modern"><?php echo __( 'Modern (recommended)','responsive-horizontal-vertical-and-accordion-tabs');?></option>
+                                                            <option <?php if ($settings['engine'] == "legacy") { ?> selected="selected" <?php } ?> value="legacy"><?php echo __( 'Legacy (jQuery, for older tab sets)','responsive-horizontal-vertical-and-accordion-tabs');?></option>
+                                                        </select>
+                                                        <div style="clear: both"></div>
+                                                        <div style="clear:both;font-size: 12px;color:black"><?php echo __("Modern uses lightweight dependency-free code. Legacy keeps the original jQuery-based rendering and is kept only for tab sets created before this update.",'responsive-horizontal-vertical-and-accordion-tabs');?></div>
                                                     </td>
                                                 </tr>
                                             </table>
@@ -1239,6 +1547,22 @@ function rt_wp_responsive_wp_admin_options_func() {
                                                     <div style="clear: both"></div>
                                             </div>
                                     </div>
+                                    <div class="stuffbox" id="namediv" style="width: 100%;opacity:0.55;">
+                                            <h3>
+                                                    <label for="scroll_edge">
+                                                        <span class="dashicons dashicons-lock" style="font-size:16px;width:16px;height:16px;vertical-align:text-bottom;"></span>
+                                                        <?php echo __('Scroll to tab edge?','responsive-horizontal-vertical-and-accordion-tabs');?>
+                                                        <span style="background:#f0b849;color:#1d2327;font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 6px;border-radius:3px;margin-left:6px;">PRO</span>
+                                                    </label>
+                                            </h3>
+                                            <div class="inside" style="pointer-events:none;">
+                                                    <div>
+                                                              <input type="checkbox" id="scroll_edge" size="30" name="scroll_edge" disabled="disabled" style="width:20px;">&nbsp;<?php echo __('Scroll to tab edge ?','responsive-horizontal-vertical-and-accordion-tabs');?>
+                                                    </div>
+                                                    <div style="clear: both"><?php echo __('Set if you want to force full-width tabs to display at the left scroll arrow. Requires the Scrollable Tabs type above.','responsive-horizontal-vertical-and-accordion-tabs'); ?> </div>
+                                            </div>
+                                    </div>
+                                    <?php wrt_render_locked_pro_field( __('Open a Specific Tab via URL','responsive-horizontal-vertical-and-accordion-tabs'), __('Link directly to a tab, e.g. yoursite.com/page/?selected_tab=2','responsive-horizontal-vertical-and-accordion-tabs') ); ?>
                                     
                                      <?php wp_nonce_field('action_image_add_edit','add_edit_image_nonce'); ?>
                                         <?php if(isset($_GET['id']) and (int) $_GET['id']>0){ ?> 
@@ -1323,27 +1647,7 @@ function rt_wp_responsive_wp_admin_options_func() {
                     <div id="postbox-container-1" class="postbox-container"> 
                    
 
-                                <div class="postbox"> 
-                                    <h3 class="hndle"><span></span><?php echo __('Access All Themes One price','responsive-horizontal-vertical-and-accordion-tabs'); ?></h3> 
-                                    <div class="inside">
-                                        <center><a href="http://www.elegantthemes.com/affiliates/idevaffiliate.php?id=11715_0_1_10" target="_blank"><img border="0" src="<?php echo plugins_url( 'images/300x250.gif', __FILE__ );?>" width="250" height="250"></a></center>
-
-                                        <div style="margin:10px 5px">
-
-                                        </div>
-                                    </div></div>
-
-                                 <div class="postbox"> 
-                                    <h3 class="hndle"><span></span><?php echo __('Google For Business Coupon','responsive-horizontal-vertical-and-accordion-tabs');?></h3> 
-                                        <div class="inside">
-                                            <center><a href="https://goo.gl/OJBuHT" target="_blank">
-                                                    <img src="<?php echo plugins_url( 'images/g-suite-promo-code-4.png', __FILE__ );?>" width="250" height="250" border="0">
-                                                </a></center>
-                                            <div style="margin:10px 5px">
-                                            </div>
-                                        </div>
-
-                                    </div>
+                                <?php wrt_render_pro_upgrade_box(); ?>
                             </div> 
                 </div>  
             </div>      
@@ -1559,31 +1863,6 @@ function rt_wp_responsive_tabs_data_management() {
 		?> 
             <div class="wrap">
                 
-               <table>
-                   <tr>
-                                <td>
-                                   <div class="fb-like" data-href="https://www.facebook.com/i13websolution" data-layout="button" data-action="like" data-size="large" data-show-faces="false" data-share="false"></div>
-                                   <div id="fb-root"></div>
-                                     <script>(function(d, s, id) {
-                                       var js, fjs = d.getElementsByTagName(s)[0];
-                                       if (d.getElementById(id)) return;
-                                       js = d.createElement(s); js.id = id;
-                                       js.src = 'https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v3.2&appId=158817690866061&autoLogAppEvents=1';
-                                       fjs.parentNode.insertBefore(js, fjs);
-                                     }(document, 'script', 'facebook-jssdk'));</script>
-                               </td>
-                                    
-                                <td>
-                                    <a target="_blank" title="Donate" href="http://www.i13websolution.com/donate-wordpress_image_thumbnail.php">
-                                        <img id="help us for free plugin" height="30" width="90" src="<?php echo plugins_url( 'images/paypaldonate.jpg', __FILE__ ) ;?>" border="0" alt="help us for free plugin" title="help us for free plugin">
-                                    </a>
-                                </td>
-                            </tr>
-                        </table>
-                          <span><h3 style="color: blue;"><a target="_blank" href="https://www.i13websolution.com/product/best-wordpress-responsive-tabs-plugin/"><?php echo __('UPGRADE TO PRO VERSION','responsive-horizontal-vertical-and-accordion-tabs');?></a></h3></span>
-
-
-
                         <?php
                         $messages = get_option ( 'wrt_responsive_tabs_msg' );
                         $type = '';
@@ -1619,6 +1898,7 @@ function rt_wp_responsive_tabs_data_management() {
 						<select name="action_upper" id="action_upper">
 							<option selected="selected" value="-1"><?php echo __('Bulk Actions','responsive-horizontal-vertical-and-accordion-tabs');?></option>
 							<option value="delete"><?php echo __('Delete','responsive-horizontal-vertical-and-accordion-tabs');?></option>
+							<option value="order_update" disabled="disabled">🔒 <?php echo __( 'Update Order (Pro)','responsive-horizontal-vertical-and-accordion-tabs');?></option>
 						</select> <input type="submit" value="<?php echo __('Apply','responsive-horizontal-vertical-and-accordion-tabs');?>"
 							class="button-secondary action" id="deleteselected"
 							name="deleteselected" onclick="return confirmDelete_bulk();">
@@ -1806,7 +2086,9 @@ function rt_wp_responsive_tabs_data_management() {
                                                                                     </div>
                                                                             </td>
                                                                             
-                                                                             <td data-title="<?php echo __('Display Order','responsive-horizontal-vertical-and-accordion-tabs');?>" class="alignCenter"><?php echo intval($row['morder']); ?></td>
+                                                                             <td data-title="<?php echo __('Display Order','responsive-horizontal-vertical-and-accordion-tabs');?>" class="alignCenter">
+                                                                                <input name="order[<?php echo intval($row['id']);?>]" style="width:80px;opacity:0.55;cursor:not-allowed;" type="number" value="<?php echo intval($row['morder']); ?>" disabled="disabled" title="<?php echo esc_attr__('Editable bulk reordering is available in Pro','responsive-horizontal-vertical-and-accordion-tabs'); ?>" />
+                                                                             </td>
                                                                             <td data-title="<?php echo __('Published On','responsive-horizontal-vertical-and-accordion-tabs');?>" class="alignCenter"><?php echo esc_html($row['createdon']); ?></td>
                                                                             <td data-title="<?php echo __('Edit','responsive-horizontal-vertical-and-accordion-tabs');?>" class="alignCenter"><strong><a href='<?php echo esc_url($editlink); ?>' title="<?php echo __('Edit','responsive-horizontal-vertical-and-accordion-tabs');?>"><?php echo __('Edit','responsive-horizontal-vertical-and-accordion-tabs');?></a></strong></td>
                                                                             <td data-title="<?php echo __('Delete','responsive-horizontal-vertical-and-accordion-tabs');?>" class="alignCenter"><strong><a href='<?php echo esc_url($deletelink); ?>' onclick="return confirmDelete();" title="<?php echo __('Delete','responsive-horizontal-vertical-and-accordion-tabs');?>"><?php echo __('Delete','responsive-horizontal-vertical-and-accordion-tabs');?></a> </strong></td>
@@ -1837,6 +2119,7 @@ function rt_wp_responsive_tabs_data_management() {
 						<select name="action" id="action_bottom">
 							<option selected="selected" value="-1"><?php echo __('Bulk Actions','responsive-horizontal-vertical-and-accordion-tabs');?></option>
 							<option value="delete"><?php echo __('Delete','responsive-horizontal-vertical-and-accordion-tabs');?></option>
+							<option value="order_update" disabled="disabled">🔒 <?php echo __( 'Update Order (Pro)','responsive-horizontal-vertical-and-accordion-tabs');?></option>
 						</select> 
                                                <?php wp_nonce_field('action_settings_mass_delete', 'mass_delete_nonce'); ?>
                                                 <input type="submit" value="<?php echo __('Apply','responsive-horizontal-vertical-and-accordion-tabs');?>"
@@ -1874,27 +2157,7 @@ function rt_wp_responsive_tabs_data_management() {
                         <div id="postbox-container-1" class="postbox-container"> 
                    
 
-                                <div class="postbox"> 
-                                    <h3 class="hndle"><span></span><?php echo __('Access All Themes One price','responsive-horizontal-vertical-and-accordion-tabs'); ?></h3> 
-                                    <div class="inside">
-                                        <center><a href="http://www.elegantthemes.com/affiliates/idevaffiliate.php?id=11715_0_1_10" target="_blank"><img border="0" src="<?php echo plugins_url( 'images/300x250.gif', __FILE__ );?>" width="250" height="250"></a></center>
-
-                                        <div style="margin:10px 5px">
-
-                                        </div>
-                                    </div></div>
-
-                                 <div class="postbox"> 
-                                    <h3 class="hndle"><span></span><?php echo __('Google For Business Coupon','responsive-horizontal-vertical-and-accordion-tabs');?></h3> 
-                                        <div class="inside">
-                                            <center><a href="https://goo.gl/OJBuHT" target="_blank">
-                                                    <img src="<?php echo plugins_url( 'images/g-suite-promo-code-4.png', __FILE__ );?>" width="250" height="250" border="0">
-                                                </a></center>
-                                            <div style="margin:10px 5px">
-                                            </div>
-                                        </div>
-
-                                    </div>
+                                <?php wrt_render_pro_upgrade_box(); ?>
                             </div>
                         <h3><?php echo __('To print this tab sets into WordPress Post/Page use below code','responsive-horizontal-vertical-and-accordion-tabs');?></h3>
 		<input type="text"
@@ -2118,27 +2381,6 @@ function rt_wp_responsive_tabs_data_management() {
          <div style="float: left; width: 100%;">
 	       <div class="wrap">
                 
-                  <table><tr>
-                               <td>
-                                    <div class="fb-like" data-href="https://www.facebook.com/i13websolution" data-layout="button" data-action="like" data-size="large" data-show-faces="false" data-share="false"></div>
-                                    <div id="fb-root"></div>
-                                      <script>(function(d, s, id) {
-                                        var js, fjs = d.getElementsByTagName(s)[0];
-                                        if (d.getElementById(id)) return;
-                                        js = d.createElement(s); js.id = id;
-                                        js.src = 'https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v3.2&appId=158817690866061&autoLogAppEvents=1';
-                                        fjs.parentNode.insertBefore(js, fjs);
-                                      }(document, 'script', 'facebook-jssdk'));</script>
-                                </td>     
-                                <td>
-                                    <a target="_blank" title="Donate" href="http://www.i13websolution.com/donate-wordpress_image_thumbnail.php">
-                                        <img id="help us for free plugin" height="30" width="90" src="<?php echo plugins_url( 'images/paypaldonate.jpg', __FILE__ ) ;?>" border="0" alt="help us for free plugin" title="help us for free plugin">
-                                    </a>
-                                </td>
-                            </tr>
-                        </table>
-                          <span><h3 style="color: blue;"><a target="_blank" href="https://www.i13websolution.com/product/best-wordpress-responsive-tabs-plugin/"><?php echo __('UPGRADE TO PRO VERSION','responsive-horizontal-vertical-and-accordion-tabs');?></a></h3></span>
-
 	    	<?php
 		    	if (isset ( $_GET ['id'] ) and intval($_GET ['id']) > 0) {
 				
@@ -2219,6 +2461,21 @@ function rt_wp_responsive_tabs_data_management() {
 											<div style="clear: both"></div>
 										</div>
 									</div>
+									<div class="stuffbox" id="namediv" style="width: 100%;opacity:0.55;">
+									<h3>
+										<label for="fonto_icon">
+											<span class="dashicons dashicons-lock" style="font-size:16px;width:16px;height:16px;vertical-align:text-bottom;"></span>
+											<?php echo __('Font Awesome Icon','responsive-horizontal-vertical-and-accordion-tabs');?>
+											<span style="background:#f0b849;color:#1d2327;font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 6px;border-radius:3px;margin-left:6px;">PRO</span>
+										</label>
+									</h3>
+									<div class="inside" style="pointer-events:none;">
+										<div>
+											<select name="fonto_icon" id="fonto_icon" disabled="disabled"><option><?php echo __('Select an icon\u2026','responsive-horizontal-vertical-and-accordion-tabs');?></option></select>
+										</div>
+										<div style="clear:both;font-size:12px;color:black;margin-top:6px;"><?php echo __('Add a Font Awesome icon next to this tab\'s title.','responsive-horizontal-vertical-and-accordion-tabs');?></div>
+									</div>
+								</div>
 									
                                                                        
 									<div class="stuffbox" id="namediv" style="width: 100%">
@@ -2345,28 +2602,7 @@ function rt_wp_responsive_tabs_data_management() {
 
 							</div>
                                                         <div id="postbox-container-1" class="postbox-container" > 
-                                                            <div class="postbox"> 
-                                                                <h3 class="hndle"><span></span><?php echo __('Google For Business Coupon','responsive-filterable-portfolio');?></h3> 
-                                                                <div class="inside">
-                                                                    <center><a href="https://goo.gl/OJBuHT" target="_blank">
-                                                                            <img src="<?php echo plugins_url( 'images/g-suite-promo-code-4.png', __FILE__ );?>" width="250" height="250" border="0">
-                                                                        </a></center>
-                                                                    <div style="margin:10px 5px">
-                                                                    </div>
-                                                                </div></div>
-                                                            <div class="postbox"> 
-                                                                <h3 class="hndle"><span></span><?php echo __('Access All Themes In One Price','responsive-filterable-portfolio');?></h3> 
-                                                                <div class="inside">
-                                                                    <center><a href="http://www.elegantthemes.com/affiliates/idevaffiliate.php?id=11715_0_1_10" target="_blank">
-                                                                            <img border="0" src="<?php echo plugins_url( 'images/300x250.gif', __FILE__ );?>" width="250" height="250">
-                                                                        </a></center>
-
-                                                                    <div style="margin:10px 5px">
-
-                                                                    </div>
-                                                                </div></div>
-                                                           
-
+                                                            <?php wrt_render_pro_upgrade_box(); ?>
                                                         </div>      
 						</div>
                                             
@@ -2607,6 +2843,11 @@ function wrt_print_rt_wp_responsive_tabs_func($atts){
         $default='';
         $loaderImg=plugins_url( 'images/bx_loader.gif', __FILE__ ); 
         $vNonce = wp_create_nonce('vNonce');
+        
+        if(is_array($settings) and sizeof($settings)>0 and isset($settings['engine']) and $settings['engine']=='modern'){
+            
+            return wrt_render_modern_tabs($settings, $tabset_id, $scroll, $vNonce);
+        }
         
         wp_enqueue_style ( 'wrt_bootstrap-nv-only.min');
         wp_enqueue_style ( 'wrt_easy-responsive-tabs' );
@@ -3292,7 +3533,124 @@ function wrt_print_rt_wp_responsive_tabs_func($atts){
         $output = do_shortcode(ob_get_clean());
         return $output;
 }
-    
+
+
+/**
+ * Renders a tab set using the dependency-free Modern engine.
+ * Reuses the same wrt_tabs / wrt_tabs_settings data and the same
+ * wp_ajax_rt_get_tab_data_byid endpoint as the Legacy engine.
+ */
+/**
+ * Renders a tab's stored description for the Modern engine, including
+ * shortcode processing (do_shortcode) — plain wpautop() alone doesn't
+ * execute shortcodes.
+ */
+function wrt_render_tab_content_html( $raw ) {
+    $content = wp_unslash( $raw );
+    if ( strpos( $content, '<!-- wp:' ) !== false ) {
+        return do_shortcode( $content );
+    }
+    return do_shortcode( wpautop( $content ) );
+}
+
+function wrt_render_modern_tabs($settings, $tabset_id, $scroll, $vNonce) {
+
+    global $wpdb;
+
+    wp_enqueue_style('wrt-modern-tabs');
+    wp_enqueue_script('wrt-modern-tabs');
+
+    $type_map = array(4 => 'horizontal', 2 => 'vertical', 5 => 'accordion');
+    $type = isset($type_map[intval($settings['type'])]) ? $type_map[intval($settings['type'])] : 'horizontal';
+
+    $query = "SELECT * FROM " . $wpdb->prefix . "wrt_tabs WHERE gtab_id=$tabset_id order by morder asc, createdon desc";
+    $rows = $wpdb->get_results($query, ARRAY_A);
+
+    $query = "SELECT id FROM " . $wpdb->prefix . "wrt_tabs WHERE gtab_id=$tabset_id and is_default=1 limit 1";
+    $rw = $wpdb->get_row($query, ARRAY_A);
+    $default_id = (is_array($rw) and sizeof($rw) > 0) ? intval($rw['id']) : (is_array($rows) and sizeof($rows) > 0 ? intval($rows[0]['id']) : 0);
+
+    $use_ajax = intval($settings['use_ajax']);
+    $rand = 'wrt_modern_' . $settings['id'] . '_' . uniqid();
+
+    $style_vars = sprintf(
+        '--wrt-active-bg:%1$s;--wrt-inactive-bg:%2$s;--wrt-border-color:%3$s;--wrt-tab-color:%4$s;--wrt-active-color:%5$s;--wrt-content-color:%6$s;',
+        esc_attr($settings['activetab_bg']),
+        esc_attr($settings['inactive_bg']),
+        esc_attr($settings['ac_border_color']),
+        esc_attr($settings['tab_fcolor']),
+        esc_attr($settings['tab_a_fcolor']),
+        esc_attr($settings['tab_ccolor'])
+    );
+
+    ob_start();
+    ?>
+    <!-- wrt_render_modern_tabs -->
+    <div
+        id="<?php echo esc_attr($rand); ?>"
+        class="wrt-modern wrt-modern--<?php echo esc_attr($type); ?>"
+        style="<?php echo esc_attr($style_vars); ?>"
+        contenteditable="false"
+        data-type="<?php echo esc_attr($type); ?>"
+        data-use-ajax="<?php echo $use_ajax ? '1' : '0'; ?>"
+        data-scroll="<?php echo intval($scroll) === 1 ? '1' : '0'; ?>"
+        data-default-id="<?php echo esc_attr($default_id); ?>"
+        data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>"
+        data-nonce="<?php echo esc_attr($vNonce); ?>"
+        data-rest-url="<?php echo esc_url( rest_url( 'wrt/v1/tab-render/' ) ); ?>"
+    >
+        <?php if ($type === 'accordion'): ?>
+            <?php foreach ($rows as $r): ?>
+                <div class="wrt-modern__item">
+                    <button type="button"
+                        class="wrt-modern__tab"
+                        role="tab"
+                        data-tabid="<?php echo esc_attr($r['id']); ?>"
+                        data-loaded="<?php echo $use_ajax ? '0' : '1'; ?>"
+                        aria-selected="false">
+                        <?php echo esc_html(trim(wp_unslash($r['tab_title']))); ?>
+                    </button>
+                    <div class="wrt-modern__panel" data-panel-id="<?php echo esc_attr($r['id']); ?>">
+                        <?php if (!$use_ajax): ?>
+                            <?php echo wrt_render_tab_content_html($r['tab_description']); ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <div class="wrt-modern__nav" role="tablist">
+                <?php foreach ($rows as $r): ?>
+                    <button type="button"
+                        class="wrt-modern__tab"
+                        role="tab"
+                        data-tabid="<?php echo esc_attr($r['id']); ?>"
+                        data-loaded="<?php echo $use_ajax ? '0' : '1'; ?>"
+                        aria-selected="false">
+                        <?php echo esc_html(trim(wp_unslash($r['tab_title']))); ?>
+                    </button>
+                <?php endforeach; ?>
+            </div>
+            <span class="wrt-modern__active-cover" aria-hidden="true"></span>
+            <div class="wrt-modern__panels">
+                <?php foreach ($rows as $r): ?>
+                    <div class="wrt-modern__panel" data-panel-id="<?php echo esc_attr($r['id']); ?>">
+                        <?php if (!$use_ajax): ?>
+                            <?php echo wrt_render_tab_content_html($r['tab_description']); ?>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+    <?php if (trim($settings['additional_css']) != ''): ?>
+        <style><?php echo html_entity_decode($settings['additional_css'], ENT_QUOTES); ?></style>
+    <?php endif; ?>
+    <!-- end wrt_render_modern_tabs -->
+    <?php
+    $output = do_shortcode(ob_get_clean());
+    return $output;
+}
+
 
 function wrt_e_gallery_get_wp_version() {
 	global $wp_version;
